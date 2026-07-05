@@ -8,11 +8,24 @@ using namespace std;
 
 using color = vec3; 
 
+inline double linear_to_gamma(double linear_component) {
+    if (linear_component > 0) {
+        return sqrt(linear_component);
+    }
+
+    return 0;
+}
+
 // writes single pixel color out to standard output stream
 void write_color(ostream& out, const color& pixel_color) {
     auto r = pixel_color.x();
     auto g = pixel_color.y();
     auto b = pixel_color.z(); 
+
+    // apply linear to gamma transform for gamma 2
+    r = linear_to_gamma(r);
+    g = linear_to_gamma(g);
+    b = linear_to_gamma(b);
 
     // translate the [0, 1] component values to the byte range [0, 255].
     static const interval intensity(0.000, 0.999);

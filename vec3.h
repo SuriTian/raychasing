@@ -117,4 +117,5 @@ inline vec3 random_on_hemisphere(const vec3& normal) {
         return -on_unit_sphere;
 }
 
+
 #endif
