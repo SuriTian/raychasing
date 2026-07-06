@@ -18,6 +18,8 @@ class camera {
         point3 lookat = point3(0, 0, -1);
         vec3 vup = vec3(0, 1, 0);
 
+        double defocus_angle = 0;
+        double focus_distance = 10;
 
         void render(const hittable& world) {
             initialize(); 
@@ -49,6 +51,8 @@ class camera {
         vec3 pixel_delta_u; // offset to pixel to right
         vec3 pixel_delta_v; // offset to pixel to below
         vec3 u, v, w; // camera frame basis vectors
+        vec3 defocus_disk_u, defocus_disk_v;
+
 
         void initialize() {
             image_height = int(image_width / aspect_ratio); // respect the aspect ratio
@@ -58,10 +62,10 @@ class camera {
 
             camera_center = lookfrom;
 
-            auto focal_length = (lookfrom - lookat).length();
+            // auto focal_length = (lookfrom - lookat).length();
             auto theta = degrees_to_radians(vfov);
             auto h = tan(theta/2);
-            auto viewport_height = 2.0 * h * focal_length;
+            auto viewport_height = 2.0 * h * focus_distance;
             auto viewport_width = viewport_height * (double(image_width)/image_height);
 
             // u, v, w basis vectors
@@ -78,17 +82,20 @@ class camera {
             pixel_delta_v = viewport_v / image_height;
 
             // Calculate location of upper left pixel
-            auto viewport_upper_left = camera_center - (focal_length * w) - (0.5 * viewport_u) - (0.5 * viewport_v);
-            pixel00_loc = viewport_upper_left + 0.5 * (pixel_delta_u + pixel_delta_v); 
+            auto viewport_upper_left = camera_center - (focus_distance * w) - (0.5 * viewport_u) - (0.5 * viewport_v);
             pixel00_loc = viewport_upper_left + 0.5 * (pixel_delta_u + pixel_delta_v); 
 
+            //camera defocus disk basis vectors
+            auto defocus_radius = focus_distance * tan(degrees_to_radians(defocus_angle) / 2); 
+            defocus_disk_u = defocus_radius * u;
+            defocus_disk_v = defocus_radius * v;
         }
         
         ray get_ray(int i, int j) const {
             auto offset = sample_square();
             auto pixel_sample = pixel00_loc + (i + offset.x()) * pixel_delta_u + (j + offset.y()) * pixel_delta_v;
 
-            auto ray_origin = camera_center;
+            auto ray_origin = (defocus_angle <= 0) ? camera_center : defocus_disk_sample();
             auto ray_direction = pixel_sample - ray_origin;
 
             return ray(ray_origin, ray_direction);
@@ -97,6 +104,11 @@ class camera {
         // next steps: try non square pixels
         vec3 sample_square() const {
             return vec3(random_double() - 0.5, random_double() - 0.5, 0);
+        }
+
+        point3 defocus_disk_sample() const {
+            auto p = random_in_unit_disk();
+            return camera_center + (p[0] * defocus_disk_u) + (p[1] * defocus_disk_v);
         }
 
         color ray_color(const ray& r, int depth, const hittable& world) const {
