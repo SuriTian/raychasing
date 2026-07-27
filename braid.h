@@ -118,33 +118,22 @@ inline Polynomial conway_polynomial_rec(const BraidWord& word, int n_strands, in
     auto it = memo.find(key);
     if (it != memo.end()) return it->second;
 
-    int i = next_index;
-    int sign = (word[i] > 0) ? 1 : -1;
+    int sign = (word[next_index] > 0) ? 1 : -1;
 
     BraidWord flipped = word;
-    flipped[i] = -word[i];
+    flipped[next_index] = -flipped[next_index];
 
     BraidWord smoothed = word;
-    smoothed.erase(smoothed.begin() + i);
+    smoothed.erase(smoothed.begin() + next_index);
 
-    Polynomial P_other = conway_polynomial_rec(flipped, n_strands, i + 1, memo);
-    Polynomial P_zero  = conway_polynomial_rec(smoothed, n_strands, 0, memo);
+    Polynomial P_other = conway_polynomial_rec(flipped, n_strands, next_index + 1, memo);
+    Polynomial P_zero  = conway_polynomial_rec(smoothed, n_strands, next_index, memo);
 
     Polynomial result = (sign > 0)
         ? P_other + Polynomial::z() * P_zero
         : P_other - Polynomial::z() * P_zero;
 
     memo[key] = result;
-    return result;
-}
-
-inline long long binomial(int n, int k) {
-    if (k < 0 || k > n) return 0;
-    if (k > n - k) k = n - k;
-    long long result = 1;
-    for (int i = 1; i <= k; ++i) {
-        result = result * (n - k + i) / i;
-    }
     return result;
 }
 
