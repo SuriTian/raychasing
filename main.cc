@@ -1,3 +1,7 @@
+#include <iostream>
+#include <sstream>
+#include <string>
+
 #include "rtweekend.h"
 
 #include "camera.h"
@@ -6,8 +10,37 @@
 #include "material.h"
 #include "sphere.h"
 #include "trefoil.h"
+#include "braid.h"
 
-int main() {
+static BraidWord parse_braid_word(const std::string& text) {
+    BraidWord word;
+    std::stringstream ss(text);
+    std::string token;
+    while (std::getline(ss, token, ',')) {
+        if (token.empty()) continue;
+        word.push_back(std::stoi(token));
+    }
+    return word;
+}
+
+static bool is_supported_braid(const BraidWord& word) {
+    if (word.empty()) return false;
+    return is_trefoil_like(word);
+}
+
+int main(int argc, char** argv) {
+    std::string input = (argc > 1) ? argv[1] : "1,1,1";
+    BraidWord braid = parse_braid_word(input);
+    Polynomial polynomial = conway_polynomial(braid);
+
+    std::cout << "Input braid: " << input << "\n";
+    std::cout << "Conway polynomial: " << polynomial.to_string() << "\n";
+
+    if (!is_supported_braid(braid)) {
+        std::cerr << "Current renderer supports only trefoil-like braids.\n";
+        return 0;
+    }
+
     // World
     hittable_list world;
 
@@ -24,9 +57,9 @@ int main() {
     // world.add(make_shared<sphere>(point3( 1.0, 0.0, -1.0), 0.5, material_right));
 
     // TREFOIL
-    auto material_trefoil = make_shared<dielectric>(1.5); 
+    auto material_trefoil = make_shared<dielectric>(1.5);
     world.add(make_shared<trefoil>(point3(0, 0, -1), 0.15, 0.04, 100, material_trefoil));
-    
+
     // auto R = cos(pi/4);
 
     // auto material_left  = make_shared<lambertian>(color(0,0,1));
@@ -50,4 +83,5 @@ int main() {
     // cam.focus_distance = 3.4;
 
     cam.render(world);
+    return 0;
 }
