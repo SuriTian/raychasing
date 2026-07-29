@@ -11,13 +11,15 @@
 #include <utility>
 #include "polynomial.h"
 
+using namespace std;
+
 // A braid word: signed integers. +i = strand i crosses OVER i+1 (sigma_i), -i = strand i crosses UNDER i+1 (sigma_i^-1)
 // Strand count is implicit: max(|entry|) + 1
-using BraidWord = std::vector<int>;
+using BraidWord = vector<int>;
 
 inline int strand_count(const BraidWord& w) {
     int m = 0;
-    for (int x : w) m = std::max(m, std::abs(x));
+    for (int x : w) m = max(m, abs(x));
     return m + 1;
 }
 
@@ -62,7 +64,7 @@ inline bool is_trefoil_like(const BraidWord& word) {
     }
 
     if (word.size() == 3 && strand_count(word) == 3) {
-        const std::vector<BraidWord> candidates = {
+        const vector<BraidWord> candidates = {
             {1, 2, 1},
             {1, -2, 1},
             {-1, -2, -1},
@@ -80,41 +82,41 @@ inline bool is_trefoil_like(const BraidWord& word) {
 
 // Checks whether `word` matches a (p, q) torus knot braid pattern
 // (up to cyclic rotation). Returns {p, q} if found.
-inline std::optional<std::pair<int,int>> match_torus_knot(const BraidWord& word, int max_p = 10, int max_q = 10) {
-    if (word.empty()) return std::nullopt;
+inline optional<pair<int,int>> match_torus_knot(const BraidWord& word, int max_p = 10, int max_q = 10) {
+    if (word.empty()) return nullopt;
     int p = strand_count(word);
-    if (p < 2 || p > max_p) return std::nullopt;
+    if (p < 2 || p > max_p) return nullopt;
 
     for (int q = 1; q <= max_q; q++) {
-        if (std::gcd(p, q) != 1) continue;
+        if (gcd(p, q) != 1) continue;
         BraidWord candidate = generate_torus_braid(p, q);
-        if (is_cyclic_equivalent(word, candidate)) return std::make_pair(p, q);
+        if (is_cyclic_equivalent(word, candidate)) return make_pair(p, q);
     }
 
     if (is_trefoil_like(word)) {
-        return std::make_pair(2, 3);
+        return make_pair(2, 3);
     }
 
-    return std::nullopt;
+    return nullopt;
 }
 
 // Skein relation:  V(L+) - V(L-) = z * V(L0)
 // Base case: empty word, 1 strand  -> unknot,          V = 1
 //            empty word, n>1 strands -> n-comp unlink,  V = 0
-inline std::string word_key(const BraidWord& w, int n_strands, int next_index) {
-    std::ostringstream ss;
+inline string word_key(const BraidWord& w, int n_strands, int next_index) {
+    ostringstream ss;
     ss << n_strands << ":" << next_index << ":";
     for (int x : w) ss << x << ",";
     return ss.str();
 }
 
 inline Polynomial conway_polynomial_rec(const BraidWord& word, int n_strands, int next_index,
-                                         std::map<std::string, Polynomial>& memo) {
+                                         map<string, Polynomial>& memo) {
     if (next_index >= static_cast<int>(word.size())) {
         return (n_strands == 1) ? Polynomial::one() : Polynomial::zero();
     }
 
-    std::string key = word_key(word, n_strands, next_index);
+    string key = word_key(word, n_strands, next_index);
     auto it = memo.find(key);
     if (it != memo.end()) return it->second;
 
@@ -143,7 +145,7 @@ inline Polynomial conway_polynomial(const BraidWord& word) {
     }
 
     if (is_trefoil_like(word)) {
-        return Polynomial(std::vector<long long>{1, 0, 1});
+        return Polynomial(vector<long long>{1, 0, 1});
     }
 
     if (strand_count(word) == 2 && !word.empty()) {
@@ -160,18 +162,18 @@ inline Polynomial conway_polynomial(const BraidWord& word) {
                 case 1:
                     return Polynomial::one();
                 case 2:
-                    return Polynomial(std::vector<long long>{0, 1});
+                    return Polynomial(vector<long long>{0, 1});
                 case 3:
-                    return Polynomial(std::vector<long long>{1, 0, 1});
+                    return Polynomial(vector<long long>{1, 0, 1});
                 case 4:
-                    return Polynomial(std::vector<long long>{0, 2});
+                    return Polynomial(vector<long long>{0, 2});
                 default:
                     break;
             }
         }
     }
 
-    std::map<std::string, Polynomial> memo;
+    map<string, Polynomial> memo;
     int n = strand_count(word);
     return conway_polynomial_rec(word, n, 0, memo);
 }
