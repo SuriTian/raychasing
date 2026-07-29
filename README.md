@@ -9,7 +9,7 @@ Unfortunately there is an incredibly large amount of type of knots in this world
 
 Warning: rendering a knot may take a VERY long time. This is because calculating the ppm just takes a long time, especially if we want to make it look cool. 
 Calculating the conway polynomial though, won't take that long. Can refer a prototype image below to what it is supposed to look like. 
-This project is still in the works to support more types of knots and improve user experience. 
+This project is still in the works to support more types of knots and improve user experience. **new patch lives in a different branch from main**
 
 ## Braid Notation
 
