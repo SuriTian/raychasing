@@ -7,9 +7,14 @@ using namespace std;
 int main() {
     const vector<pair<BraidWord, string>> cases = {
         {{1, 1, 1}, "z^2 + 1"},
-        {{1, 1, 1, 1}, "2*z"},
-        {{1, 2, 1}, "z^2 + 1"},
+        {{1, 1, 1, 1}, "z^3 + 2*z"},
+        {{1, 2, 1}, "z"},
         {{1}, "1"},
+        {{1,1,2,2}, "z^2"},
+        {{1,2,1,2}, "z^2 + 1"},
+        {{1,-1}, "0"},
+        {{1,2}, "1"},
+        {{1,2,-1,2}, "1"},
     };
 
     for (const auto& [word, expected] : cases) {

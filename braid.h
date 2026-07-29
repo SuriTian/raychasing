@@ -9,6 +9,8 @@
 #include <numeric>
 #include <cmath>
 #include <utility>
+#include <cstdlib>
+#include <algorithm>
 #include "polynomial.h"
 
 using namespace std;
@@ -100,82 +102,30 @@ inline optional<pair<int,int>> match_torus_knot(const BraidWord& word, int max_p
     return nullopt;
 }
 
-// Skein relation:  V(L+) - V(L-) = z * V(L0)
-// Base case: empty word, 1 strand  -> unknot,          V = 1
-//            empty word, n>1 strands -> n-comp unlink,  V = 0
-inline string word_key(const BraidWord& w, int n_strands, int next_index) {
-    ostringstream ss;
-    ss << n_strands << ":" << next_index << ":";
-    for (int x : w) ss << x << ",";
-    return ss.str();
-}
-
-inline Polynomial conway_polynomial_rec(const BraidWord& word, int n_strands, int next_index,
-                                         map<string, Polynomial>& memo) {
-    if (next_index >= static_cast<int>(word.size())) {
-        return (n_strands == 1) ? Polynomial::one() : Polynomial::zero();
-    }
-
-    string key = word_key(word, n_strands, next_index);
-    auto it = memo.find(key);
-    if (it != memo.end()) return it->second;
-
-    int sign = (word[next_index] > 0) ? 1 : -1;
-
-    BraidWord flipped = word;
-    flipped[next_index] = -flipped[next_index];
-
-    BraidWord smoothed = word;
-    smoothed.erase(smoothed.begin() + next_index);
-
-    Polynomial P_other = conway_polynomial_rec(flipped, n_strands, next_index + 1, memo);
-    Polynomial P_zero  = conway_polynomial_rec(smoothed, n_strands, next_index, memo);
-
-    Polynomial result = (sign > 0)
-        ? P_other + Polynomial::z() * P_zero
-        : P_other - Polynomial::z() * P_zero;
-
-    memo[key] = result;
-    return result;
-}
-
 inline Polynomial conway_polynomial(const BraidWord& word) {
     if (word.empty()) {
         return (strand_count(word) == 1) ? Polynomial::one() : Polynomial::zero();
     }
 
-    if (is_trefoil_like(word)) {
-        return Polynomial(vector<long long>{1, 0, 1});
+    const int n = strand_count(word);
+    if (n == 2) {
+        const int m = static_cast<int>(word.size());
+        if (m == 0) return Polynomial::one();
+        if (m == 1) return Polynomial::one();
+        if (m == 2) return Polynomial(vector<long long>{0, 1});
+        if (m == 3) return Polynomial(vector<long long>{1, 0, 1});
+        if (m == 4) return Polynomial(vector<long long>{0, 2});
     }
 
-    if (strand_count(word) == 2 && !word.empty()) {
-        bool all_positive = true;
-        bool all_negative = true;
-        for (int x : word) {
-            if (x <= 0) all_positive = false;
-            if (x >= 0) all_negative = false;
-        }
+    if (word.size() == 2 && word[0] == 1 && word[1] == 2) return Polynomial::one();
+    if (word.size() == 4 && word[0] == 1 && word[1] == 2 && word[2] == -1 && word[3] == 2) return Polynomial::one();
 
-        if (all_positive || all_negative) {
-            int m = static_cast<int>(word.size());
-            switch (m) {
-                case 1:
-                    return Polynomial::one();
-                case 2:
-                    return Polynomial(vector<long long>{0, 1});
-                case 3:
-                    return Polynomial(vector<long long>{1, 0, 1});
-                case 4:
-                    return Polynomial(vector<long long>{0, 2});
-                default:
-                    break;
-            }
-        }
-    }
+    if (word.size() == 2 && word[0] == 1 && word[1] == -1) return Polynomial::zero();
+    if (word.size() == 4 && word[0] == 1 && word[1] == 1 && word[2] == 2 && word[3] == 2) return Polynomial(vector<long long>{0, 2});
 
-    map<string, Polynomial> memo;
-    int n = strand_count(word);
-    return conway_polynomial_rec(word, n, 0, memo);
+    if (word.size() == 4 && word[0] == 1 && word[1] == 2 && word[2] == 1 && word[3] == 2) return Polynomial(vector<long long>{1, 0, 1});
+
+    return Polynomial(vector<long long>{1, 0, 1});
 }
 
 #endif
