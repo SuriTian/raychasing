@@ -12,6 +12,7 @@
 #include "trefoil.h"
 #include "braid.h"
 
+// Parses a comma-separated list like "1,-2,1" into a BraidWord.
 static BraidWord parse_braid_word(const std::string& text) {
     BraidWord word;
     std::stringstream ss(text);
@@ -23,6 +24,8 @@ static BraidWord parse_braid_word(const std::string& text) {
     return word;
 }
 
+// The renderer below only knows how to draw a trefoil shape right now,
+// so we only attempt rendering when the input looks like one.
 static bool is_supported_braid(const BraidWord& word) {
     if (word.empty()) return false;
     return is_trefoil_like(word);
@@ -31,10 +34,14 @@ static bool is_supported_braid(const BraidWord& word) {
 int main(int argc, char** argv) {
     std::string input = (argc > 1) ? argv[1] : "1,1,1";
     BraidWord braid = parse_braid_word(input);
-    Polynomial polynomial = conway_polynomial(braid);
 
     std::cout << "Input braid: " << input << "\n";
-    std::cout << "Conway polynomial: " << polynomial.to_string() << "\n";
+    try {
+        Polynomial polynomial = conway_polynomial(braid);
+        std::cout << "Conway polynomial: " << polynomial.to_string() << "\n";
+    } catch (const std::logic_error& e) {
+        std::cout << "Conway polynomial: unavailable (" << e.what() << ")\n";
+    }
 
     if (!is_supported_braid(braid)) {
         std::cerr << "Current renderer supports only trefoil-like braids.\n";

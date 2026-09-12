@@ -5,6 +5,10 @@
 #include <vector>
 #include <cmath>
 
+// Renders a trefoil knot as a tube around a parametric 3D curve. We sample
+// points along the curve, then ray-march a signed distance field (SDF) that
+// measures distance to the nearest sampled segment minus the tube radius --
+// this avoids needing an explicit polygon mesh for the tube surface.
 class trefoil : public hittable {
 public:
     trefoil(point3 center, double scale, double tube_radius,
@@ -100,6 +104,7 @@ private:
     static constexpr int max_steps = 96;
     static constexpr double epsilon = 5e-4;
 
+    // Standard parametric trefoil curve, t in [0, 2*pi).
     static point3 curve(double t) {
         double x = sin(t) + 2 * sin(2 * t);
         double y = cos(t) - 2 * cos(2 * t);

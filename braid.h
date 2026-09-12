@@ -9,8 +9,7 @@
 #include <numeric>
 #include <cmath>
 #include <utility>
-#include <cstdlib>
-#include <algorithm>
+#include <stdexcept>
 #include "polynomial.h"
 
 using namespace std;
@@ -19,6 +18,7 @@ using namespace std;
 // Strand count is implicit: max(|entry|) + 1
 using BraidWord = vector<int>;
 
+// Number of strands = highest strand index touched by the word, plus one.
 inline int strand_count(const BraidWord& w) {
     int m = 0;
     for (int x : w) m = max(m, abs(x));
@@ -50,6 +50,11 @@ inline bool is_cyclic_equivalent(const BraidWord& a, const BraidWord& b) {
     return false;
 }
 
+// NOTE: this only recognizes trefoil-*shaped* words (3 crossings, uniform sign),
+// it does not verify the closure is actually a knot (1 component). E.g. [1,2,1]
+// has this shape but its closure is a 2-component Hopf link after Markov
+// destabilization, not the trefoil. Used only for renderability/torus-knot
+// hints elsewhere -- conway_polynomial() below does not trust it.
 inline bool is_trefoil_like(const BraidWord& word) {
     if (word.empty()) return false;
 
@@ -102,30 +107,53 @@ inline optional<pair<int,int>> match_torus_knot(const BraidWord& word, int max_p
     return nullopt;
 }
 
+// On 2 strands there's only one generator (sigma_1), so a word is fully
+// described by its net exponent e = (#positive crossings) - (#negative
+// crossings) -- order doesn't matter. V_e follows a simple recursion:
+//   V_0 = 0 (unlink), V_1 = 1 (unknot), V_e = z*V_{e-1} + V_{e-2}
+// Negative e (more under-crossings than over) just runs that recursion
+// backwards: V_k = V_{k+2} - z*V_{k+1}.
+inline Polynomial conway_polynomial_two_strand(int e) {
+    vector<Polynomial> v;
+    v.push_back(Polynomial::zero()); // V_0
+    v.push_back(Polynomial::one());  // V_1
+
+    if (e >= 0) {
+        for (int k = 2; k <= e; k++) {
+            v.push_back(Polynomial::z() * v[k - 1] + v[k - 2]);
+        }
+        return v[e];
+    }
+
+    // same recursion, run backwards from k=-1 down to e
+    Polynomial v_next2 = v[1]; // V_1
+    Polynomial v_next1 = v[0]; // V_0
+    Polynomial result = Polynomial::zero();
+    for (int k = -1; k >= e; k--) {
+        result = v_next2 - Polynomial::z() * v_next1;
+        v_next2 = v_next1;
+        v_next1 = result;
+    }
+    return result;
+}
+
+// Only 2-strand braids are supported right now -- see the note above
+// conway_polynomial_two_strand(). Words on 3+ strands need the
+// Burau/Alexander-polynomial machinery, which isn't implemented yet
+// (a naive attempt at this lived here before and was silently wrong for
+// every multi-strand input, so it was removed rather than patched).
 inline Polynomial conway_polynomial(const BraidWord& word) {
     if (word.empty()) {
         return (strand_count(word) == 1) ? Polynomial::one() : Polynomial::zero();
     }
 
-    const int n = strand_count(word);
-    if (n == 2) {
-        const int m = static_cast<int>(word.size());
-        if (m == 0) return Polynomial::one();
-        if (m == 1) return Polynomial::one();
-        if (m == 2) return Polynomial(vector<long long>{0, 1});
-        if (m == 3) return Polynomial(vector<long long>{1, 0, 1});
-        if (m == 4) return Polynomial(vector<long long>{0, 2});
+    if (strand_count(word) != 2) {
+        throw std::logic_error("conway_polynomial: only 2-strand braids are currently supported");
     }
 
-    if (word.size() == 2 && word[0] == 1 && word[1] == 2) return Polynomial::one();
-    if (word.size() == 4 && word[0] == 1 && word[1] == 2 && word[2] == -1 && word[3] == 2) return Polynomial::one();
-
-    if (word.size() == 2 && word[0] == 1 && word[1] == -1) return Polynomial::zero();
-    if (word.size() == 4 && word[0] == 1 && word[1] == 1 && word[2] == 2 && word[3] == 2) return Polynomial(vector<long long>{0, 2});
-
-    if (word.size() == 4 && word[0] == 1 && word[1] == 2 && word[2] == 1 && word[3] == 2) return Polynomial(vector<long long>{1, 0, 1});
-
-    return Polynomial(vector<long long>{1, 0, 1});
+    int e = 0;
+    for (int x : word) e += (x > 0) ? 1 : -1;
+    return conway_polynomial_two_strand(e);
 }
 
 #endif

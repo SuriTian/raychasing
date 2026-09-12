@@ -6,6 +6,7 @@
 
 using namespace std; 
 
+// Parses a comma-separated list like "1,-2,1" into a BraidWord.
 static BraidWord parse_braid_word(const std::string& text) {
     BraidWord word;
     stringstream ss(text);
@@ -21,11 +22,16 @@ static BraidWord parse_braid_word(const std::string& text) {
 int main(int argc, char** argv) {
     string input = argc > 1 ? argv[1] : "1,1,1";
     BraidWord word = parse_braid_word(input);
-    Polynomial poly = conway_polynomial(word);
 
     cout << "Input braid: " << input << "\n";
     cout << "Strands: " << strand_count(word) << "\n";
-    cout << "Conway polynomial: " << poly.to_string() << "\n";
+
+    try {
+        Polynomial poly = conway_polynomial(word);
+        cout << "Conway polynomial: " << poly.to_string() << "\n";
+    } catch (const std::logic_error& e) {
+        cout << "Conway polynomial: unavailable (" << e.what() << ")\n";
+    }
 
     auto torus = match_torus_knot(word);
     if (torus) {
