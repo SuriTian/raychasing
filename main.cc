@@ -12,20 +12,8 @@
 #include "trefoil.h"
 #include "braid.h"
 
-// Parses a comma-separated list like "1,-2,1" into a BraidWord.
-static BraidWord parse_braid_word(const std::string& text) {
-    BraidWord word;
-    std::stringstream ss(text);
-    std::string token;
-    while (std::getline(ss, token, ',')) {
-        if (token.empty()) continue;
-        word.push_back(std::stoi(token));
-    }
-    return word;
-}
-
-// The renderer below only knows how to draw a trefoil shape right now,
-// so we only attempt rendering when the input looks like one.
+// The renderer below only knows how to draw a trefoil, so we only attempt a
+// render when the braid actually closes to one.
 static bool is_supported_braid(const BraidWord& word) {
     if (word.empty()) return false;
     return is_trefoil_like(word);
@@ -33,18 +21,30 @@ static bool is_supported_braid(const BraidWord& word) {
 
 int main(int argc, char** argv) {
     std::string input = (argc > 1) ? argv[1] : "1,1,1";
-    BraidWord braid = parse_braid_word(input);
 
-    std::cout << "Input braid: " << input << "\n";
+    BraidWord braid;
+    try {
+        braid = parse_braid_word(input);
+    } catch (const std::invalid_argument& e) {
+        std::cerr << "Could not read that braid word: " << e.what() << "\n"
+                  << "Expected a comma-separated list of nonzero integers, e.g. 1,-2,1\n";
+        return 1;
+    }
+
+    // stdout carries the PPM and nothing else -- the usual way to run this is
+    // `RayChasing.exe > image.ppm`, and anything else printed there lands in
+    // the middle of the image file.
+    std::cerr << "Input braid: " << input << "\n";
     try {
         Polynomial polynomial = conway_polynomial(braid);
-        std::cout << "Conway polynomial: " << polynomial.to_string() << "\n";
-    } catch (const std::logic_error& e) {
-        std::cout << "Conway polynomial: unavailable (" << e.what() << ")\n";
+        std::cerr << "Conway polynomial: " << polynomial.to_string() << "\n";
+    } catch (const std::exception& e) {
+        std::cerr << "Conway polynomial: unavailable (" << e.what() << ")\n";
     }
 
     if (!is_supported_braid(braid)) {
-        std::cerr << "Current renderer supports only trefoil-like braids.\n";
+        std::cerr << "That braid does not close to a trefoil, which is the only knot "
+                     "this renderer can draw so far.\n";
         return 0;
     }
 

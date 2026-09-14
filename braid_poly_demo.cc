@@ -6,30 +6,26 @@
 
 using namespace std; 
 
-// Parses a comma-separated list like "1,-2,1" into a BraidWord.
-static BraidWord parse_braid_word(const std::string& text) {
-    BraidWord word;
-    stringstream ss(text);
-    string token;
-    while (getline(ss, token, ',')) {
-        if (token.empty()) continue;
-        int value = stoi(token);
-        word.push_back(value);
-    }
-    return word;
-}
-
 int main(int argc, char** argv) {
     string input = argc > 1 ? argv[1] : "1,1,1";
-    BraidWord word = parse_braid_word(input);
+
+    BraidWord word;
+    try {
+        word = parse_braid_word(input);
+    } catch (const invalid_argument& e) {
+        cerr << "Could not read that braid word: " << e.what() << "\n"
+             << "Expected a comma-separated list of nonzero integers, e.g. 1,-2,1\n";
+        return 1;
+    }
 
     cout << "Input braid: " << input << "\n";
     cout << "Strands: " << strand_count(word) << "\n";
+    cout << "Closes to: " << closure_component_count(word) << " component(s)\n";
 
     try {
         Polynomial poly = conway_polynomial(word);
         cout << "Conway polynomial: " << poly.to_string() << "\n";
-    } catch (const std::logic_error& e) {
+    } catch (const std::exception& e) {
         cout << "Conway polynomial: unavailable (" << e.what() << ")\n";
     }
 
@@ -40,8 +36,8 @@ int main(int argc, char** argv) {
         cout << "Does not match a simple torus knot pattern.\n";
     }
 
-    if (word == BraidWord{1, 1, 1}) {
-        cout << "Trefoil-like input detected; current renderer supports trefoil geometry.\n";
+    if (is_trefoil_like(word)) {
+        cout << "Closure is a trefoil; the renderer can draw this one.\n";
     }
 
     return 0;

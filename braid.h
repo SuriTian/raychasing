@@ -3,7 +3,6 @@
 
 #include <vector>
 #include <optional>
-#include <map>
 #include <string>
 #include <sstream>
 #include <numeric>
@@ -11,12 +10,44 @@
 #include <utility>
 #include <stdexcept>
 #include "polynomial.h"
+#include "burau.h"
 
 using namespace std;
 
 // A braid word: signed integers. +i = strand i crosses OVER i+1 (sigma_i), -i = strand i crosses UNDER i+1 (sigma_i^-1)
 // Strand count is implicit: max(|entry|) + 1
 using BraidWord = vector<int>;
+
+// Parses a comma-separated list like "1,-2,1" into a BraidWord. Throws
+// invalid_argument on anything that isn't a list of nonzero whole numbers --
+// 0 is not a generator, and letting it through indexes off the end of the
+// strand array further down.
+inline BraidWord parse_braid_word(const string& text) {
+    BraidWord word;
+    stringstream ss(text);
+    string token;
+    while (getline(ss, token, ',')) {
+        const size_t first = token.find_first_not_of(" \t");
+        if (first == string::npos) continue;
+        token = token.substr(first, token.find_last_not_of(" \t") - first + 1);
+
+        size_t consumed = 0;
+        int value = 0;
+        try {
+            value = stoi(token, &consumed);
+        } catch (const exception&) {
+            throw invalid_argument("'" + token + "' is not a whole number");
+        }
+        if (consumed != token.size()) {
+            throw invalid_argument("'" + token + "' is not a whole number");
+        }
+        if (value == 0) {
+            throw invalid_argument("0 is not a braid generator -- use 1, -1, 2, -2, ...");
+        }
+        word.push_back(value);
+    }
+    return word;
+}
 
 // Number of strands = highest strand index touched by the word, plus one.
 inline int strand_count(const BraidWord& w) {
@@ -35,6 +66,11 @@ inline BraidWord generate_torus_braid(int p, int q) {
     return w;
 }
 
+// Same as the burau.h version, with the strand count filled in from the word.
+inline int closure_component_count(const BraidWord& w) {
+    return closure_component_count(w, strand_count(w));
+}
+
 // Braid closures are invariant under cyclic rotation of the word.
 inline bool is_cyclic_equivalent(const BraidWord& a, const BraidWord& b) {
     if (a.size() != b.size()) return false;
@@ -48,63 +84,6 @@ inline bool is_cyclic_equivalent(const BraidWord& a, const BraidWord& b) {
         if (match) return true;
     }
     return false;
-}
-
-// NOTE: this only recognizes trefoil-*shaped* words (3 crossings, uniform sign),
-// it does not verify the closure is actually a knot (1 component). E.g. [1,2,1]
-// has this shape but its closure is a 2-component Hopf link after Markov
-// destabilization, not the trefoil. Used only for renderability/torus-knot
-// hints elsewhere -- conway_polynomial() below does not trust it.
-inline bool is_trefoil_like(const BraidWord& word) {
-    if (word.empty()) return false;
-
-    if (word.size() == 3 && strand_count(word) == 2) {
-        bool all_positive = true;
-        bool all_negative = true;
-        for (int x : word) {
-            if (x <= 0) all_positive = false;
-            if (x >= 0) all_negative = false;
-        }
-        if (all_positive || all_negative) {
-            return true;
-        }
-    }
-
-    if (word.size() == 3 && strand_count(word) == 3) {
-        const vector<BraidWord> candidates = {
-            {1, 2, 1},
-            {1, -2, 1},
-            {-1, -2, -1},
-            {-1, 2, -1}
-        };
-        for (const auto& candidate : candidates) {
-            if (is_cyclic_equivalent(word, candidate)) {
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-
-// Checks whether `word` matches a (p, q) torus knot braid pattern
-// (up to cyclic rotation). Returns {p, q} if found.
-inline optional<pair<int,int>> match_torus_knot(const BraidWord& word, int max_p = 10, int max_q = 10) {
-    if (word.empty()) return nullopt;
-    int p = strand_count(word);
-    if (p < 2 || p > max_p) return nullopt;
-
-    for (int q = 1; q <= max_q; q++) {
-        if (gcd(p, q) != 1) continue;
-        BraidWord candidate = generate_torus_braid(p, q);
-        if (is_cyclic_equivalent(word, candidate)) return make_pair(p, q);
-    }
-
-    if (is_trefoil_like(word)) {
-        return make_pair(2, 3);
-    }
-
-    return nullopt;
 }
 
 // On 2 strands there's only one generator (sigma_1), so a word is fully
@@ -137,23 +116,63 @@ inline Polynomial conway_polynomial_two_strand(int e) {
     return result;
 }
 
-// Only 2-strand braids are supported right now -- see the note above
-// conway_polynomial_two_strand(). Words on 3+ strands need the
-// Burau/Alexander-polynomial machinery, which isn't implemented yet
-// (a naive attempt at this lived here before and was silently wrong for
-// every multi-strand input, so it was removed rather than patched).
+// Two strands keep the closed form above -- it is cheap, and it doubles as an
+// independent check on the matrices. Everything wider goes through the Burau
+// representation in burau.h, knots and links alike.
 inline Polynomial conway_polynomial(const BraidWord& word) {
     if (word.empty()) {
         return (strand_count(word) == 1) ? Polynomial::one() : Polynomial::zero();
     }
 
-    if (strand_count(word) != 2) {
-        throw std::logic_error("conway_polynomial: only 2-strand braids are currently supported");
+    const int strands = strand_count(word);
+
+    if (strands == 2) {
+        int e = 0;
+        for (int x : word) e += (x > 0) ? 1 : -1;
+        return conway_polynomial_two_strand(e);
     }
 
-    int e = 0;
-    for (int x : word) e += (x > 0) ? 1 : -1;
-    return conway_polynomial_two_strand(e);
+    return conway_polynomial_via_burau(word, strands);
+}
+
+// True when the closure of `word` is, as far as its Conway polynomial can
+// tell, the trefoil. This asks an invariant of the closed-up knot rather than
+// pattern-matching the word, so [1,2,1] no longer counts: it has trefoil shape
+// but closes to a 2-component link. Two caveats worth knowing:
+//   - the Conway polynomial does not separate every knot, so an exotic knot
+//     sharing z^2 + 1 would slip through;
+//   - it is blind to mirror images, so both handednesses pass -- which suits
+//     the renderer, since it draws one fixed chirality either way.
+inline bool is_trefoil_like(const BraidWord& word) {
+    if (word.empty()) return false;
+    try {
+        if (closure_component_count(word) != 1) return false;
+        return conway_polynomial(word).coeffs == vector<long long>{1, 0, 1}; // z^2 + 1
+    } catch (const exception&) {
+        // A word we cannot evaluate is not one we can claim is a trefoil, and a
+        // predicate the renderer calls should answer rather than throw.
+        return false;
+    }
+}
+
+// Checks whether `word` matches a (p, q) torus knot braid pattern
+// (up to cyclic rotation). Returns {p, q} if found.
+inline optional<pair<int,int>> match_torus_knot(const BraidWord& word, int max_p = 10, int max_q = 10) {
+    if (word.empty()) return nullopt;
+    int p = strand_count(word);
+    if (p < 2 || p > max_p) return nullopt;
+
+    for (int q = 1; q <= max_q; q++) {
+        if (gcd(p, q) != 1) continue;
+        BraidWord candidate = generate_torus_braid(p, q);
+        if (is_cyclic_equivalent(word, candidate)) return make_pair(p, q);
+    }
+
+    if (is_trefoil_like(word)) {
+        return make_pair(2, 3);
+    }
+
+    return nullopt;
 }
 
 #endif

@@ -5,6 +5,7 @@
 #include <string>
 #include <sstream>
 #include <algorithm>
+#include "checked_int.h"
 
 // Simple dense polynomial in one variable (z), integer coefficients.
 // coeffs[i] = coefficient of z^i
@@ -27,15 +28,15 @@ public:
 
     Polynomial operator+(const Polynomial& o) const {
         std::vector<long long> r(std::max(coeffs.size(), o.coeffs.size()), 0);
-        for (std::size_t i = 0; i < coeffs.size(); i++) r[i] += coeffs[i];
-        for (std::size_t i = 0; i < o.coeffs.size(); i++) r[i] += o.coeffs[i];
+        for (std::size_t i = 0; i < coeffs.size(); i++) r[i] = checked_add(r[i], coeffs[i]);
+        for (std::size_t i = 0; i < o.coeffs.size(); i++) r[i] = checked_add(r[i], o.coeffs[i]);
         return Polynomial(r);
     }
 
     Polynomial operator-(const Polynomial& o) const {
         std::vector<long long> r(std::max(coeffs.size(), o.coeffs.size()), 0);
-        for (std::size_t i = 0; i < coeffs.size(); i++) r[i] += coeffs[i];
-        for (std::size_t i = 0; i < o.coeffs.size(); i++) r[i] -= o.coeffs[i];
+        for (std::size_t i = 0; i < coeffs.size(); i++) r[i] = checked_add(r[i], coeffs[i]);
+        for (std::size_t i = 0; i < o.coeffs.size(); i++) r[i] = checked_add(r[i], -o.coeffs[i]);
         return Polynomial(r);
     }
 
@@ -43,7 +44,7 @@ public:
         std::vector<long long> r(coeffs.size() + o.coeffs.size() - 1, 0);
         for (std::size_t i = 0; i < coeffs.size(); i++)
             for (std::size_t j = 0; j < o.coeffs.size(); j++)
-                r[i + j] += coeffs[i] * o.coeffs[j];
+                r[i + j] = checked_add(r[i + j], checked_mul(coeffs[i], o.coeffs[j]));
         return Polynomial(r);
     }
 
